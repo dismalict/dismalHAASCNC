@@ -85,7 +85,7 @@ specific_messages_xpaths.update(additional_messages_xpaths)
 
 # Read configuration from .config file
 config = configparser.ConfigParser()
-config.read('sfcncv.ini')
+config.read('sfcnc.ini')
 
 db_cursor = None
 db_connection = None
