@@ -7,11 +7,13 @@
 if ! command -v pip &> /dev/null
 then
     echo "pip not found, installing..."
-    apt-get install -y python3-pip
+    sudo su
+    sudo apt-get install -y python3-pip
 fi
-
+sudo su
+# install python-is-python3
+sudo apt-get install -y python-is-python3
 # Install required Python packages
-sudo pip3 install --upgrade mysql-connector-python jetson_stats psutil
-
-# Ensure jtop is installed
-sudo apt install jtop
+sudo pip3 install mysql-connector-python
+sudo pip3 install configparser
+sudo pip3 install pytz
