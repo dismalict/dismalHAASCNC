@@ -642,23 +642,26 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "max": 3500000,
           "min": 0,
           "thresholds": {
-            "mode": "percentage",
+            "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
               },
               {
-                "color": "orange",
-                "value": 70
+                "color": "yellow",
+                "value": 1850000
               },
               {
                 "color": "red",
-                "value": 85
+                "value": 2500000
               }
             ]
           },
@@ -696,7 +699,7 @@
             "type": "mysql",
             "uid": "edgy057tei2o0d"
           },
-          "editorMode": "builder",
+          "editorMode": "code",
           "format": "table",
           "rawSql": "SELECT MachineRunTime FROM sfcncpool.sfcnc01 ORDER BY Timestamp DESC LIMIT 1 ",
           "refId": "A",
@@ -1065,7 +1068,6 @@
       "type": "stat"
     }
   ],
-  "refresh": "5s",
   "schemaVersion": 39,
   "tags": [
     "CNC"
@@ -1074,13 +1076,13 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
-    "to": "now"
+    "from": "2024-08-01T14:42:42.000Z",
+    "to": "2024-08-01T14:50:16.000Z"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "SFCNC01",
   "uid": "adhqaqbdqpds0d2",
-  "version": 5,
+  "version": 7,
   "weekStart": ""
 }
