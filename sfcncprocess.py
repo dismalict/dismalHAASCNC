@@ -167,7 +167,7 @@ try:
                     logging.error(f"Error occurred for {machine_name}: {e}")
 
         # Wait for 15 seconds before fetching data for the next loop
-        time.sleep(15)
+        time.sleep(5)
 
 except KeyboardInterrupt:
     print("Process interrupted by user.")
