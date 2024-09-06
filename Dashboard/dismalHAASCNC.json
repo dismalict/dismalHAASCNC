@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 37,
   "links": [],
   "panels": [
     {
@@ -119,7 +119,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT Timestamp, SpindleSpeed FROM sfcncpool.sfcnc01 ORDER BY Timestamp DESC LIMIT 1000 ",
+          "rawSql": "SELECT Timestamp, SpindleSpeed FROM sfcncpool.sfcnc02 ORDER BY Timestamp DESC LIMIT 1000 ",
           "refId": "A",
           "sql": {
             "columns": [
@@ -285,7 +285,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT RunStatus, EmergencyStop, ActiveAlarms FROM sfcncpool.sfcnc01 ORDER BY Timestamp DESC LIMIT 1 ",
+          "rawSql": "SELECT RunStatus, EmergencyStop, ActiveAlarms FROM sfcncpool.sfcnc02 ORDER BY Timestamp DESC LIMIT 1 ",
           "refId": "A",
           "sql": {
             "columns": [
@@ -472,7 +472,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": " \r\n SELECT M30Counter1, M30Counter2, Mode, Program FROM sfcncpool.sfcnc01 ORDER BY Timestamp DESC LIMIT 1 ",
+          "rawSql": " \r\n SELECT M30Counter1, M30Counter2, Mode, Program FROM sfcncpool.sfcnc02 ORDER BY Timestamp DESC LIMIT 1 ",
           "refId": "A",
           "sql": {
             "columns": [
@@ -585,7 +585,8 @@
           },
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT Timestamp, CycleRemainingTime FROM sfcncpool.sfcnc01 ORDER BY Timestamp DESC LIMIT 1000 ",
+          "rawQuery": true,
+          "rawSql": "SELECT Timestamp, CycleRemainingTime FROM sfcncpool.sfcnc02 ORDER BY Timestamp DESC LIMIT 1000 ",
           "refId": "A",
           "sql": {
             "columns": [
@@ -701,7 +702,8 @@
           },
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT MachineRunTime FROM sfcncpool.sfcnc01 ORDER BY Timestamp DESC LIMIT 1 ",
+          "rawQuery": true,
+          "rawSql": "SELECT MachineRunTime FROM sfcncpool.sfcnc02 ORDER BY Timestamp DESC LIMIT 1 ",
           "refId": "A",
           "sql": {
             "columns": [
@@ -993,7 +995,8 @@
           },
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT Timestamp, SpindleSpeed, FeedrateOverride, RapidOverride, SpindleSpeedOverride FROM sfcncpool.sfcnc01 ORDER BY Timestamp DESC LIMIT 1000 ",
+          "rawQuery": true,
+          "rawSql": "SELECT Timestamp, SpindleSpeed, FeedrateOverride, RapidOverride, SpindleSpeedOverride FROM sfcncpool.sfcnc02 ORDER BY Timestamp DESC LIMIT 1000 ",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1068,6 +1071,7 @@
       "type": "stat"
     }
   ],
+  "refresh": "5s",
   "schemaVersion": 39,
   "tags": [
     "CNC"
@@ -1076,13 +1080,13 @@
     "list": []
   },
   "time": {
-    "from": "2024-08-01T14:42:42.000Z",
-    "to": "2024-08-01T14:50:16.000Z"
+    "from": "now-3h",
+    "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SFCNC01",
-  "uid": "adhqaqbdqpds0d2",
-  "version": 7,
+  "title": "SFCNC02",
+  "uid": "adhqaqbdqpds0d21",
+  "version": 4,
   "weekStart": ""
 }
