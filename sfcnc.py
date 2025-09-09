@@ -8,8 +8,37 @@ import configparser
 import mysql.connector
 import pytz  # Import pytz for time zone conversion
 
-# Configure the logging module
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.DEBUG,  # show everything
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+# --- Config ---
+config = configparser.ConfigParser()
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sfcnc.ini')
+config.read(config_path)
+logging.debug("DB config loaded: %s", dict(config['database']))
+
+# --- Database setup ---
+db_cursor = None
+db_connection = None
+
+for machine_name in config.sections():
+    if machine_name != 'database':
+        CNC_IP = config.get(machine_name, 'CNC_IP')
+        CNC_PORT = config.getint(machine_name, 'CNC_PORT', fallback=8082)
+        MACHINE_type = config.get(machine_name, 'MACHINE_type')
+        table_name = config.get(machine_name, 'table', fallback=f'sfcnc{machine_name[-2:]}')
+
+        url = f"http://{CNC_IP}:{CNC_PORT}/{MACHINE_type}/current"
+        logging.info(f"Polling {machine_name} → {url}")
+
+        try:
+            response = requests.get(url, timeout=5)
+            logging.info(f"{machine_name} responded with {response.status_code}")
+        except Exception as e:
+            logging.error(f"Failed to reach {machine_name} at {url}: {e}")
+
 logging.info("Script started")
 
 # Define column titles
@@ -83,16 +112,6 @@ additional_messages_xpaths = {
 # Merge additional_messages_xpaths into specific_messages_xpaths
 specific_messages_xpaths.update(additional_messages_xpaths)
 
-# Read configuration from .config file
-config = configparser.ConfigParser()
-config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sfcnc.ini')
-config.read(config_path)
-
-print("DB config loaded:", dict(config['database']))
-
-db_cursor = None
-db_connection = None
-
 def convert_boolean(value):
     """Convert string boolean-like values to integer."""
     if value.lower() in ['true', '1']:
@@ -102,7 +121,6 @@ def convert_boolean(value):
     return value  # Return as is if not a boolean-like string
 
 try:
-    # Connect to MySQL database
     db_config = config['database']
     db_connection = mysql.connector.connect(
         user=db_config['username'],
@@ -113,64 +131,53 @@ try:
     )
     db_cursor = db_connection.cursor()
 
-    # Main loop for each machine
     while True:
         for machine_name in config.sections():
-            if machine_name != 'database':  # Skip the 'Database' section
-                try:
-                    # Global variables for the CNC machine's IP and port
-                    CNC_IP = config.get(machine_name, 'CNC_IP')
-                    CNC_PORT = config.getint(machine_name, 'CNC_PORT', fallback=8082)
-                    MACHINE_type = config.get(machine_name, 'MACHINE_type')
-                    table_name = config.get(machine_name, 'table', fallback=f'sfcnc{machine_name[-2:]}')  # Extract the last two characters of machine_name
+            if machine_name == 'database':
+                continue
 
-                    # Send a GET request to the MT Connect URL
-                    response = requests.get(f"http://{CNC_IP}:{CNC_PORT}/{MACHINE_type}/current")
+            CNC_IP = config.get(machine_name, 'CNC_IP')
+            CNC_PORT = config.getint(machine_name, 'CNC_PORT', fallback=8082)
+            MACHINE_type = config.get(machine_name, 'MACHINE_type')
+            table_name = config.get(machine_name, 'table', fallback=f'sfcnc{machine_name[-2:]}')
 
-                    # Check if the request was successful (status code 200)
-                    if response.status_code == 200:
-                        # Parse the XML content
-                        root = ET.fromstring(response.content)
-                        logging.info(f"Connection Successful - Data Pulled for {machine_name}")
+            url = f"http://{CNC_IP}:{CNC_PORT}/{MACHINE_type}/current"
+            logging.info(f"Polling {machine_name} → {url}")
 
-                        # Register the MT Connect namespace
-                        namespace = {"mt": "urn:mtconnect.org:MTConnectStreams:1.2"}
+            try:
+                response = requests.get(url, timeout=5)
+                if response.status_code == 200:
+                    logging.info(f"{machine_name} responded with 200")
+                    root = ET.fromstring(response.content)
+                    namespace = {"mt": "urn:mtconnect.org:MTConnectStreams:1.2"}
 
-                        # Create a dictionary to store the extracted values
-                        extracted_values = {}
+                    extracted_values = {}
+                    for message, xpath_query in specific_messages_xpaths.items():
+                        elements = root.findall(xpath_query, namespace)
+                        value = elements[0].text if elements else None
+                        extracted_values[message] = convert_boolean(value) if message != 'RtcpEnabled' else value
 
-                        # Iterate through specific_messages_xpaths and extract values
-                        for message, xpath_query in specific_messages_xpaths.items():
-                            elements = root.findall(xpath_query, namespace)
-                            if elements:
-                                value = elements[0].text
-                                extracted_values[message] = convert_boolean(value) if message != 'RtcpEnabled' else value
-                            else:
-                                extracted_values[message] = None  # Explicitly set to None
+                    now_utc = datetime.now(pytz.utc)
+                    values = [now_utc] + [extracted_values.get(col, None) for col in column_titles[1:]]
 
-                        # Convert the current time to UTC
-                        now_utc = datetime.now(pytz.utc)
+                    sql = f"INSERT INTO {table_name} ({', '.join(column_titles)}) VALUES ({', '.join(['%s']*len(column_titles))})"
+                    logging.debug("Preparing SQL: %s", sql)
+                    logging.debug("Values: %s", values)
 
-                        # Prepare data for insertion
-                        values = [now_utc] + [extracted_values.get(col, None) for col in column_titles[1:]]
+                    try:
+                        db_cursor.execute(sql, values)
+                        db_connection.commit()
+                        logging.info(f"✅ Data inserted into {table_name} table for {machine_name}")
+                    except mysql.connector.Error as err:
+                        logging.error(f"❌ Error inserting data into {table_name}: {err}")
 
-                        # Prepare SQL statement
-                        sql = f"INSERT INTO {table_name} ({', '.join(column_titles)}) VALUES ({', '.join(['%s'] * len(column_titles))})"
+                else:
+                    logging.warning(f"Failed to fetch data for {machine_name}. Status code: {response.status_code}")
 
-                        try:
-                            db_cursor.execute(sql, values)
-                            db_connection.commit()
-                            logging.info(f"Data inserted into {table_name} table for {machine_name}")
-                        except mysql.connector.Error as err:
-                            logging.error(f"Error inserting data into {table_name} table: {err}")
+            except Exception as e:
+                logging.error(f"Error for {machine_name}: {e}")
 
-                    else:
-                        logging.warning(f"Failed to fetch data for {machine_name}. Status code: {response.status_code}")
-                except Exception as e:
-                    logging.error(f"Error occurred for {machine_name}: {e}")
-
-        # Wait for 15 seconds before fetching data for the next loop
-        time.sleep(5)
+        time.sleep(15)
 
 except KeyboardInterrupt:
     print("Process interrupted by user.")
