@@ -85,7 +85,10 @@ specific_messages_xpaths.update(additional_messages_xpaths)
 
 # Read configuration from .config file
 config = configparser.ConfigParser()
-config.read('sfcnc.ini')
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sfcnc.ini')
+config.read(config_path)
+
+print("DB config loaded:", dict(config['database']))
 
 db_cursor = None
 db_connection = None
