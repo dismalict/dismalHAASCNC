@@ -19,28 +19,6 @@ config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sfcnc.in
 config.read(config_path)
 logging.debug("DB config loaded: %s", dict(config['database']))
 
-# --- Database setup ---
-db_cursor = None
-db_connection = None
-
-for machine_name in config.sections():
-    if machine_name != 'database':
-        CNC_IP = config.get(machine_name, 'CNC_IP')
-        CNC_PORT = config.getint(machine_name, 'CNC_PORT', fallback=8082)
-        MACHINE_type = config.get(machine_name, 'MACHINE_type')
-        table_name = config.get(machine_name, 'table', fallback=f'sfcnc{machine_name[-2:]}')
-
-        url = f"http://{CNC_IP}:{CNC_PORT}/{MACHINE_type}/current"
-        logging.info(f"Polling {machine_name} → {url}")
-
-        try:
-            response = requests.get(url, timeout=5)
-            logging.info(f"{machine_name} responded with {response.status_code}")
-        except Exception as e:
-            logging.error(f"Failed to reach {machine_name} at {url}: {e}")
-
-logging.info("Script started")
-
 # Define column titles
 column_titles = ["Timestamp", "RapidOverride", "LastCycle", "ThisCycle", "CycleRemainingTime",
                  "FeedrateOverride", "SpindleSpeed", "SpindleSpeedOverride",
@@ -121,6 +99,8 @@ def convert_boolean(value):
     return value  # Return as is if not a boolean-like string
 
 try:
+    logging.info("Script started")
+
     db_config = config['database']
     db_connection = mysql.connector.connect(
         user=db_config['username'],
@@ -130,6 +110,7 @@ try:
         database=db_config['database']
     )
     db_cursor = db_connection.cursor()
+    logging.debug("DB config loaded: %s", dict(db_config))
 
     while True:
         for machine_name in config.sections():
