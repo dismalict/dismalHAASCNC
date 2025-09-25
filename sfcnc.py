@@ -92,6 +92,8 @@ specific_messages_xpaths.update(additional_messages_xpaths)
 
 def convert_boolean(value):
     """Convert string boolean-like values to integer."""
+    if value is None:
+        return None
     if value.lower() in ['true', '1']:
         return 1
     elif value.lower() in ['false', '0']:
@@ -101,17 +103,34 @@ def convert_boolean(value):
 try:
     logging.info("Script started")
 
-    db_config = config['database']
-    db_connection = mysql.connector.connect(
-        user=db_config['username'],
-        password=db_config['password'],
-        host=db_config['host'],
-        port=db_config.getint('port', fallback=3306),
-        database=db_config['database']
-    )
-    db_cursor = db_connection.cursor()
-    logging.debug("DB config loaded: %s", dict(db_config))
+    # Initialize DB variables
+    db_connection = None
+    db_cursor = None
 
+    # Load database config
+    db_config = config['database']
+
+    # Attempt to connect to MySQL
+    try:
+        db_connection = mysql.connector.connect(
+            user=db_config['username'],
+            password=db_config['password'],
+            host=db_config['host'],
+            port=db_config.getint('port', fallback=3306),
+            database=db_config['database'],
+            ssl_disabled=True
+        )
+        db_cursor = db_connection.cursor()
+        logging.debug("DB config loaded: %s", dict(db_config))
+        logging.info("Database connection established successfully.")
+    except mysql.connector.Error as err:
+        logging.error(f"DB connection failed: {err}")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected DB error: {e}")
+        raise
+
+    # Main data gathering loop
     while True:
         for machine_name in config.sections():
             if machine_name == 'database':
@@ -123,7 +142,7 @@ try:
             table_name = config.get(machine_name, 'table', fallback=f'sfcnc{machine_name[-2:]}')
 
             url = f"http://{CNC_IP}:{CNC_PORT}/{MACHINE_type}/current"
-            logging.info(f"Polling {machine_name} → {url}")
+            logging.info(f"Gathering data from {machine_name} → {url}")
 
             try:
                 response = requests.get(url, timeout=5)
@@ -141,30 +160,53 @@ try:
                     now_utc = datetime.now(pytz.utc)
                     values = [now_utc] + [extracted_values.get(col, None) for col in column_titles[1:]]
 
+                    # --- Insert into per-machine table ---
                     sql = f"INSERT INTO {table_name} ({', '.join(column_titles)}) VALUES ({', '.join(['%s']*len(column_titles))})"
-                    logging.debug("Preparing SQL: %s", sql)
-                    logging.debug("Values: %s", values)
-
                     try:
                         db_cursor.execute(sql, values)
                         db_connection.commit()
-                        logging.info(f"✅ Data inserted into {table_name} table for {machine_name}")
+                        logging.info(f"✅ Data inserted into {table_name} for {machine_name}")
                     except mysql.connector.Error as err:
-                        logging.error(f"❌ Error inserting data into {table_name}: {err}")
+                        logging.error(f"❌ Error inserting into {table_name}: {err}")
+
+                    # --- Insert into historical table ---
+                    hist_columns = ["MachineName"] + column_titles
+                    hist_values = [machine_name] + values
+                    hist_sql = f"INSERT INTO cnc_historical ({', '.join(hist_columns)}) VALUES ({', '.join(['%s']*len(hist_columns))})"
+                    try:
+                        db_cursor.execute(hist_sql, hist_values)
+                        db_connection.commit()
+                        logging.info(f"📦 Historical row inserted for {machine_name}")
+                    except mysql.connector.Error as err:
+                        logging.error(f"❌ Error inserting into cnc_historical: {err}")
+
+                    # --- Prune old history (>7 days) ---
+                    prune_sql = """
+                        DELETE FROM cnc_historical
+                        WHERE Timestamp < (NOW() - INTERVAL 7 DAY)
+                    """
+                    try:
+                        db_cursor.execute(prune_sql)
+                        db_connection.commit()
+                        logging.debug("🧹 Historical table pruned to last 7 days")
+                    except mysql.connector.Error as err:
+                        logging.error(f"Error pruning historical table: {err}")
 
                 else:
                     logging.warning(f"Failed to fetch data for {machine_name}. Status code: {response.status_code}")
 
             except Exception as e:
-                logging.error(f"Error for {machine_name}: {e}")
+                logging.error(f"Error fetching data for {machine_name}: {e}")
 
+        # Wait before next loop
         time.sleep(15)
 
 except KeyboardInterrupt:
     print("Process interrupted by user.")
+
 finally:
-    # Close database connection
     if db_cursor:
         db_cursor.close()
     if db_connection:
         db_connection.close()
+    logging.info("Database connection closed.")
